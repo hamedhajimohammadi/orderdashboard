@@ -2,15 +2,20 @@
 import { useState, useEffect, useRef } from "react";
 import { useOrderStore } from "@/store/useOrderStore";
 import SecurityCheckCard from "./SecurityCheckCard";
+import OrderChatPanel from "@/components/admin/support/OrderChatPanel"; // Import the component
 
 export default function FocusModal({ order, onClose }) {
   const { updateOrderStatus, releaseOrder, saveOrderNote, fetchOrderNotes, currentNotes, isLoadingNotes } = useOrderStore();
   
   const [note, setNote] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
-  const [sendToTelegram, setSendToTelegram] = useState(false); // ✅ اضافه شد
-  const [isNotesExpanded, setIsNotesExpanded] = useState(false); // 📱 وضعیت نمایش چت در موبایل
-  const [isSyncing, setIsSyncing] = useState(false); // 🔄 وضعیت همگام‌سازی
+  const [sendToTelegram, setSendToTelegram] = useState(false); 
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false); 
+  const [isSyncing, setIsSyncing] = useState(false); 
+  const [showChat, setShowChat] = useState(true); // Default to true or persistent
+  const [activeTab, setActiveTab] = useState('details'); // Mobile Tab: 'details' or 'chat'
+  const [conversationId, setConversationId] = useState(null); // To store conversation ID if exists
+
   const notesEndRef = useRef(null);
 
   // ============================================================
@@ -67,6 +72,25 @@ export default function FocusModal({ order, onClose }) {
   useEffect(() => {
     notesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [currentNotes]);
+
+  // Loading conversation for this order
+  useEffect(() => {
+    if (order?.id) {
+       const fetchConv = async () => {
+         try {
+           const res = await fetch(`/api/admin/support/conversations/by-order/${order.id}`);
+           if (res.ok) {
+             const data = await res.json();
+             if (data.conversation) {
+               setConversationId(data.conversation.id);
+               // Auto pick up if free? Maybe optional.
+             }
+           }
+         } catch (e) { console.error(e); }
+       }
+       fetchConv();
+    }
+  }, [order]);
 
   const copyToClipboard = (text) => {
     if (!text) return;
@@ -157,6 +181,13 @@ export default function FocusModal({ order, onClose }) {
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
                         <h2 className="text-sm md:text-xl font-black text-gray-800 tracking-tight truncate">سفارش #{orderNumber}</h2>
+                        {/* Desktop Toggle Button */}
+                        <button 
+                             onClick={() => setShowChat(!showChat)}
+                             className={`hidden md:flex text-xs px-2 py-1 rounded-full border items-center gap-1 transition-colors ${showChat ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'}`}
+                        >
+                             💬 گفتگو
+                        </button>
                         {hasTelegram && (
                             <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold border border-blue-100 flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
@@ -183,11 +214,41 @@ export default function FocusModal({ order, onClose }) {
             </div>
         </div>
 
+        {/* Mobile Tab Bar */}
+        <div className="flex md:hidden border-b border-gray-200 bg-white">
+            <button 
+                onClick={() => setActiveTab('details')}
+                className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === 'details' ? 'border-blue-600 text-blue-600 bg-blue-50/20' : 'border-transparent text-gray-500'}`}
+            >
+                📝 جزئیات سفارش
+            </button>
+            <button 
+                onClick={() => { setActiveTab('chat'); setShowChat(true); }}
+                className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors relative ${activeTab === 'chat' ? 'border-blue-600 text-blue-600 bg-blue-50/20' : 'border-transparent text-gray-500'}`}
+            >
+                💬 چت آنلاین
+                {order?.user?.last_seen && (Date.now() - new Date(order.user.last_seen).getTime() < 300000) && (
+                    <span className="absolute top-2 left-2 w-2 h-2 bg-green-500 rounded-full border border-white animate-pulse"></span>
+                )}
+            </button>
+        </div>
+
         {/* بدنه اصلی */}
-        <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
+        <div className="flex flex-1 overflow-hidden flex-col md:flex-row relative">
             
-            {/* 🟦 ستون راست: محصولات */}
-            <div className="w-full md:w-5/12 bg-white border-b md:border-b-0 md:border-l overflow-y-auto custom-scrollbar flex-1 md:flex-none md:h-full p-4 space-y-6">
+            {/* Chat Panel - Only for Mobile Tab View */}
+            {conversationId && activeTab === 'chat' && (
+                <div className="md:hidden flex-1 flex flex-col w-full h-full bg-white z-20">
+                    <OrderChatPanel conversationId={conversationId} />
+                </div>
+            )}
+
+            {/* 🟦 ستون راست: محصولات (Web: Middle Column -> Now Right Column) */}
+            <div className={`
+                bg-white border-b md:border-b-0 md:border-l overflow-y-auto custom-scrollbar p-4 space-y-6 transition-all
+                ${activeTab === 'details' ? 'flex-1 w-full block' : 'hidden md:block'}
+                md:w-1/2
+            `}>
                 
                 {/* ✅ استفاده از متغیر lineItems که امن است */}
                 {lineItems.map((item, index) => {
@@ -258,12 +319,42 @@ export default function FocusModal({ order, onClose }) {
                 <SecurityCheckCard order={order} />
             </div>
 
-            {/* 🟧 ستون چپ: چت و مالی */}
-            <div className={`w-full md:w-7/12 bg-gray-50 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${isNotesExpanded ? 'h-[50vh] md:h-auto border-t-4 border-blue-100' : 'h-auto md:h-auto'}`}>
+            {/* 🟧 ستون چپ: چت و یادداشت (Web: Left Column with Tabs) */}
+            <div className={`w-full md:w-1/2 bg-gray-50 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${isNotesExpanded ? 'h-[50vh] md:h-auto border-t-4 border-blue-100' : 'h-auto md:h-auto'}`}>
                 
-                {/* اطلاعات مالی و دکمه باز کردن چت */}
+                {/* 🏷️ تب‌های دسکتاپ برای این ستون (چت آنلاین / یادداشت داخلی) */}
+                <div className="hidden md:flex bg-white border-b border-gray-200 sticky top-0 z-10">
+                    <button 
+                        onClick={() => setShowChat(true)} 
+                        className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors relative ${showChat ? 'border-green-500 text-green-700 bg-green-50/30' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    >
+                         💬 گفتگوی آنلاین
+                         {order?.user?.last_seen && (Date.now() - new Date(order.user.last_seen).getTime() < 300000) && (
+                             <span className="absolute top-3 right-3 w-2 h-2 bg-green-500 rounded-full border border-white animate-pulse"></span>
+                         )}
+                    </button>
+                    <button 
+                        onClick={() => setShowChat(false)} 
+                        className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors ${!showChat ? 'border-blue-500 text-blue-700 bg-blue-50/30' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    >
+                         📝 یادداشت‌های داخلی
+                    </button>
+                </div>
+
+                {/* 1. حالت چت آنلاین (Desktop Only here - Mobile uses separate tab) */}
+                {showChat && conversationId ? (
+                     <div className="flex-1 overflow-hidden hidden md:flex flex-col h-full bg-slate-100">
+                        <OrderChatPanel conversationId={conversationId} />
+                     </div>
+                ) : null}
+
+                {/* 2. حالت یادداشت‌های داخلی (وقتی چت بسته است یا موبایل) */}
                 <div 
-                    className="bg-white px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0 cursor-pointer md:cursor-default active:bg-gray-50 transition"
+                    className={`${(showChat && conversationId) ? 'hidden' : 'flex'} md:${(!showChat || !conversationId) ? 'flex' : 'hidden'} flex-1 flex-col overflow-hidden relative bg-gray-50 h-full`}
+                >
+                {/* هدر موبایل برای اطلاعات مالی */}
+                <div 
+                    className="md:hidden bg-white px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0 cursor-pointer active:bg-gray-50 transition sticky top-0 z-10"
                     onClick={() => setIsNotesExpanded(!isNotesExpanded)}
                 >
                     <div className="text-[10px] text-gray-500 flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
@@ -280,17 +371,6 @@ export default function FocusModal({ order, onClose }) {
                                     <span className="text-xs">!</span> تایید نشده
                                 </span>
                             )}
-
-                            {/* Order Count Badge */}
-                            {order?.user?.orders_count === 1 ? (
-                                <span className="text-[10px] bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-md">
-                                    اول
-                                </span>
-                            ) : (order?.user?.orders_count > 1) ? (
-                                <span className="text-[10px] bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-md">
-                                    {order.user.orders_count}مین
-                                </span>
-                            ) : null}
 
                             {phoneNumber && (
                                 <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100" onClick={(e) => e.stopPropagation()}>
@@ -317,7 +397,7 @@ export default function FocusModal({ order, onClose }) {
                 </div>
 
                 {/* چت باکس */}
-                <div className={`${isNotesExpanded ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden relative bg-gray-50`}>
+                <div className={`${isNotesExpanded ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden relative bg-gray-50 h-full`}>
                     
                     <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
                         {currentNotes.length === 0 && !isLoadingNotes ? (
@@ -326,7 +406,6 @@ export default function FocusModal({ order, onClose }) {
                             <div className="relative border-r-2 border-gray-200 mr-4 space-y-6 pr-6 py-2">
                                 {currentNotes.map((n, i) => (
                                     <div key={i} className="relative">
-                                        {/* دایره روی خط زمان */}
                                         <div className="absolute -right-[31px] top-1 w-4 h-4 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center z-10">
                                             <div className={`w-2 h-2 rounded-full ${n.type === 'created' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                                         </div>
@@ -371,16 +450,6 @@ export default function FocusModal({ order, onClose }) {
                         </div>
 
                         <div className="flex gap-2 items-center">
-                            {/* New Chat Button */}
-                            <a 
-                                href={`/admin/support?orderId=${order.id}`}
-                                target="_blank"
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
-                            >
-                                <span className="text-lg">💬</span>
-                                <span className="text-xs font-bold">چت سایت</span>
-                            </a>
-
                             <div 
                                 onClick={() => setSendToTelegram(!sendToTelegram)}
                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl cursor-pointer transition border ${sendToTelegram ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}
@@ -409,6 +478,7 @@ export default function FocusModal({ order, onClose }) {
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
         {/* 🟢 فوتر: دکمه‌ها */}

@@ -23,3 +23,4 @@ backup_before_ui_update_*.tar.gz
 
 # OS generated
 Thumbs.db
+deploy/

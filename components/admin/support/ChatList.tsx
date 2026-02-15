@@ -48,20 +48,28 @@ export default function ChatList({ selectedId, onSelect, initialOrderId }: { sel
                     const lastMsg = chat.messages?.[0];
                     const isActive = selectedId === chat.id;
                     const isUnread = chat.status === 'WAITING_FOR_ADMIN' || (lastMsg?.sender === 'USER' && !lastMsg?.is_read);
+                    
+                    // Simple online check (within 5 minutes)
+                    const isOnline = chat.user?.last_seen && (Date.now() - new Date(chat.user.last_seen).getTime() < 5 * 60 * 1000);
 
                     return (
                         <div 
                             key={chat.id}
                             onClick={() => onSelect(chat.id, chat.order_id)}
-                            className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-all
+                            className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-all relative
                                 ${isActive ? 'bg-white border-r-4 border-r-blue-500 shadow-sm' : ''}
                                 ${isUnread ? 'bg-blue-50/50' : ''}
                             `}
                         >
                             <div className="flex justify-between items-start mb-1">
-                                <span className={`text-sm ${isUnread ? 'font-black text-gray-900' : 'font-semibold text-gray-700'}`}>
-                                    {chat.user_id ? `کاربر #${chat.user_id}` : `مهمان ${chat.id}`}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                    <span className={`text-sm ${isUnread ? 'font-black text-gray-900' : 'font-semibold text-gray-700'}`}>
+                                        {chat.user_id ? `کاربر #${chat.user_id}` : `مهمان ${chat.id}`}
+                                    </span>
+                                    {isOnline && (
+                                        <span className="w-2.5 h-2.5 bg-green-500 rounded-full border border-white shadow-sm" title="آنلاین در ۵ دقیقه گذشته"></span>
+                                    )}
+                                </div>
                                 <span className="text-xs text-gray-400 dir-ltr">
                                     {new Date(chat.updated_at).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
                                 </span>
@@ -72,11 +80,22 @@ export default function ChatList({ selectedId, onSelect, initialOrderId }: { sel
                             </p>
                             
                             <div className="flex items-center justify-between mt-2">
-                                {chat.order ? (
-                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded border border-gray-200">
-                                        سفارش #{chat.order.wp_order_id.toString()}
-                                    </span>
-                                ) : <span></span>}
+                                <div className="flex gap-1">
+                                    {chat.order && (
+                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded border border-gray-200">
+                                            #{chat.order.wp_order_id.toString()}
+                                        </span>
+                                    )}
+                                    {chat.assignee ? (
+                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded border border-blue-200 truncate max-w-[80px]">
+                                            {chat.assignee.display_name || chat.assignee.first_name}
+                                        </span>
+                                    ) : (
+                                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] rounded border border-orange-200">
+                                            آزاد
+                                        </span>
+                                    )}
+                                </div>
                                 {isUnread && <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>}
                             </div>
                         </div>

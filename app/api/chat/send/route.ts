@@ -4,9 +4,7 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 function setCorsHeaders(res: NextResponse) {
-  res.headers.set('Access-Control-Allow-Origin', 'https://pgemshop.com');
-  // Allow localhost for testing if needed, or make it dynamic based on origin
-  // but prompt specifically mentioned pgemshop.com
+  res.headers.set('Access-Control-Allow-Origin', '*'); // Allow all origins for now to avoid CORS issues during dev/testing
   res.headers.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   return res;
@@ -33,23 +31,42 @@ export async function POST(req: Request) {
     }
 
     // Search criteria logic for OPEN conversation
-    const searchConditions: any = {
-        OR: [
-            { status: 'OPEN' },
-            { status: 'WAITING_FOR_ADMIN' }
-        ]
+    const statusFilter = {
+        in: ['OPEN', 'WAITING_FOR_ADMIN']
+    };
+
+    const whereClause: any = {
+        status: statusFilter
     };
 
     if (userId) {
-        searchConditions.user_id = Number(userId);
-    } else {
-        searchConditions.guest_token = guestToken;
+        whereClause.user_id = Number(userId);
+    } else if (guestToken) {
+        whereClause.guest_token = guestToken;
     }
 
-    let conversation = await prisma.conversation.findFirst({
-        where: searchConditions,
-        orderBy: { updated_at: 'desc' }
-    });
+    // If orderId is provided, we prefer a conversation linked to that order if it exists and is open
+    if (orderId) {
+        // We can try to find by order_id specifically first
+        const orderConversation = await prisma.conversation.findFirst({
+            where: {
+                order_id: Number(orderId),
+                status: statusFilter
+            }
+        });
+        if (orderConversation) {
+            // Found one linked to order
+             var conversation = orderConversation;
+        }
+    }
+
+    // If not found by order_id (or orderId not provided), search by user/guest
+    if (typeof conversation === 'undefined' || !conversation) {
+        var conversation = await prisma.conversation.findFirst({
+            where: whereClause,
+            orderBy: { updated_at: 'desc' }
+        });
+    }
 
     if (!conversation) {
         // Create new conversation
@@ -58,16 +75,26 @@ export async function POST(req: Request) {
                 user_id: userId ? Number(userId) : null,
                 guest_token: userId ? null : guestToken,
                 order_id: orderId ? Number(orderId) : null,
-                status: 'OPEN'
+                status: 'AI_HANDLING' // Start with AI handling by default for new chats
             }
         });
     } else {
-        // If orderId is provided specifically now, we might want to update the conversation
-        // providing it's not already linked to another order?
+        // If orderId is provided specifically now, and conversation not linked, update it?
+        // Or if the conversation was found by user/guest but not linked to this order?
         if (orderId && !conversation.order_id) {
             await prisma.conversation.update({
                 where: { id: conversation.id },
                 data: { order_id: Number(orderId) }
+            });
+        }
+        
+        // Update status to WAITING_FOR_ADMIN since user sent a message (if not already AI or specific flow)
+        // Note: For now we default to WAITING_FOR_ADMIN if user speaks. 
+        // If we want AI to reply, we might keep it as AI_HANDLING and have a separate background job.
+        if (conversation.status !== 'WAITING_FOR_ADMIN' && conversation.status !== 'AI_HANDLING') {
+             await prisma.conversation.update({
+                where: { id: conversation.id },
+                data: { status: 'WAITING_FOR_ADMIN' }
             });
         }
     }
@@ -76,7 +103,8 @@ export async function POST(req: Request) {
         data: {
             conversation_id: conversation.id,
             sender: sender || 'USER',
-            content: content
+            content: content,
+            is_read: false
         }
     });
 
@@ -84,9 +112,7 @@ export async function POST(req: Request) {
     await prisma.conversation.update({
         where: { id: conversation.id },
         data: { 
-            updated_at: new Date(),
-            // If user sent message, ensure status is OPEN or WAITING_FOR_ADMIN?
-            // "status" defaults to OPEN.
+            updated_at: new Date()
         }
     });
 

@@ -63,7 +63,22 @@ export async function GET(request) {
       },
       // ✅ نکته مهم: این خط باعث می‌شود اطلاعات مشتری هم به سفارش چسبانده شود
       include: {
-        user: true, 
+        user: {
+             select: {
+                 id: true,
+                 first_name: true,
+                 last_name: true,
+                 phone_number: true, 
+                 last_seen: true // اضافه کردن وضعیت آنلاین برای فرانت
+             }
+        },
+        conversations: { // اضافه کردن گفتگو برای چک کردن وضعیت چت
+             select: {
+                 id: true,
+                 assignee_id: true,
+                 status: true
+             }
+        }
       },
     });
 

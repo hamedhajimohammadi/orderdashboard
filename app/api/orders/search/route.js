@@ -41,7 +41,22 @@ export async function GET(req) {
           order_date: 'desc', // Sort by creation date as requested ("last order that came in")
         },
         include: {
-          user: true,
+          user: {
+               select: {
+                   id: true,
+                   first_name: true,
+                   last_name: true,
+                   phone_number: true, 
+                   last_seen: true // اضافه کردن وضعیت آنلاین برای فرانت
+               }
+          },
+          conversations: {
+               select: {
+                   id: true,
+                   assignee_id: true,
+                   status: true
+               }
+          }
         },
       }),
       prisma.order.count({ where: whereCondition })

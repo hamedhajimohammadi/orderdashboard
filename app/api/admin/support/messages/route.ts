@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,17 +13,23 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 });
     }
 
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: Number(conversationId) },
+      include: { 
+        assignee: {
+           select: { id: true, display_name: true, first_name: true, last_name: true }
+        } 
+      }
+    });
+
     const messages = await prisma.message.findMany({
         where: { conversation_id: Number(conversationId) },
         orderBy: { created_at: 'asc' }
     });
 
-    // Mark as read by ADMIN?
-    // Maybe we should have a separate action for marking read.
-    // For now, let's assume fetching them implies reading them or handle it in POST.
-    
-    return NextResponse.json({ messages });
+    return NextResponse.json({ messages, conversation });
   } catch (error) {
+    console.error('Fetch Messages Error:', error);
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
   }
 }

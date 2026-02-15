@@ -29,16 +29,30 @@ export default function DashboardHeader({ onSearch }) {
     return () => clearInterval(interval);
   }, [isOnline, lastLoginTime, totalOnlineSeconds]);
 
+  // Heartbeat for "Last Seen" (Online Status)
+  useEffect(() => {
+    if (!currentUser) return;
+    const heartBeat = async () => {
+        try { await fetch('/api/me/heartbeat', { method: 'POST' }); } catch(e) {}
+    };
+    heartBeat(); // Initial call
+    const interval = setInterval(heartBeat, 60000); // Every minute
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const currentCount = dailyStats?.completed || 0;
   const targetCount = dailyStats?.target || 25;
   const bonusAmount = Math.max(0, currentCount - targetCount) * (dailyStats?.bonusRate || 5000);
   const progressPercent = Math.min(100, (currentCount / targetCount) * 100);
 
   // لینک‌های ناوبری
-  const navLinks = [];
+  const navLinks = [
+      { href: '/order-dashboard', label: 'میز کار', icon: '🏠' },
+  ];
 
   if (currentUser?.role === 'administrator') {
     navLinks.push(
+      { href: '/admin/support', label: 'پشتیبانی آنلاین', icon: '💬' },
       { href: '/admin/users', label: 'کاربران', icon: '👥' },
       { href: '/supervisor', label: 'نظارت', icon: '👀' }
     );
@@ -94,16 +108,15 @@ export default function DashboardHeader({ onSearch }) {
             return (
                 <Link 
                     key={link.href} 
-                    href={link.href}
+                    href={link.href} // link.href
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap
                         ${isActive 
                             ? 'bg-white text-blue-600 shadow-sm border border-gray-200' 
-                            : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
-                        }
+                            : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}
                     `}
                 >
-                    <span className="text-base">{link.icon}</span>
-                    <span>{link.label}</span>
+                    <span className="text-lg">{link.icon}</span> {/* Use link.icon */}
+                    <span>{link.label}</span> {/* Use link.label */}
                 </Link>
             );
         })}

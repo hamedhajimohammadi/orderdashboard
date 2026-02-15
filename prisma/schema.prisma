@@ -1,258 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model User {
-  id                Int      @id @default(autoincrement())
-  admin_username    String?  @unique
-  admin_password    String?
-  role              String   @default("customer")
-  is_online         Boolean  @default(false)
-  last_active_at    DateTime?
-  worked_seconds_today Int   @default(0)
-  display_name      String?
-  daily_quota       Int      @default(0)
-  bonus_rate        Int      @default(0)
-  base_salary       Decimal  @default(0) @db.Decimal(15, 0)
-  is_banned         Boolean  @default(false)
-  phone_number      String   @unique
-  first_name        String?
-  last_name         String?
-  telegram_chat_id  BigInt?  @unique
-  telegram_username String?
-  metadata          Json?    @default("{}")
-  total_spent       Decimal  @default(0) @db.Decimal(15, 0)
-  orders_count      Int      @default(0)
-  is_verified       Boolean  @default(false)
-  real_name         String?
-  national_code     String?
-  card_number       String?
-  bank_name         String?
-  verification_file String?
-  referral_code     String?  @unique
-  diamond_balance   Int      @default(0)
-  points            Int      @default(0)
-  last_order_date   DateTime?
-  segment           String   @default("NEWBIE")
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
-  orders            Order[]
-  sessions          ChatSession[]
-  @@map("users")
+  id                     Int            @id @default(autoincrement())
+  phone_number           String         @unique
+  first_name             String?
+  last_name              String?
+  telegram_chat_id       BigInt?        @unique
+  telegram_username      String?
+  metadata               Json?          @default("{}")
+  total_spent            Decimal        @default(0) @db.Decimal(15, 0)
+  orders_count           Int            @default(0)
+  diamond_balance        Int            @default(0)
+  last_order_date        DateTime?
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+  admin_password         String?
+  admin_username         String?        @unique
+  base_salary            Decimal        @default(0) @db.Decimal(15, 0)
+  bonus_rate             Int            @default(0)
+  daily_quota            Int            @default(0)
+  display_name           String?
+  is_banned              Boolean        @default(false)
+  last_seen              DateTime?
+  is_online              Boolean        @default(false)
+  last_active_at         DateTime?
+  role                   String         @default("customer")
+  worked_seconds_today   Int            @default(0)
+  assigned_conversations Conversation[] @relation("ConversationAssignee")
+  conversations          Conversation[]
+  orders                 Order[]
+
   @@index([telegram_chat_id])
+  @@map("users")
 }
 
 model Order {
-  id                Int      @id @default(autoincrement())
-  wp_order_id       BigInt   
-  source            String   @default("pgem")
-  order_title       String?
-  user_id           Int
-  user              User     @relation(fields: [user_id], references: [id])
-  total_amount_gross Decimal  @db.Decimal(15, 0)
-  final_payable      Decimal  @db.Decimal(15, 0)
-  commission_cost    Decimal  @default(0) @db.Decimal(15, 0)
+  id                 Int            @id @default(autoincrement())
+  wp_order_id        BigInt         @unique
+  order_title        String?
+  user_id            Int
+  total_amount_gross Decimal        @db.Decimal(15, 0)
+  final_payable      Decimal        @db.Decimal(15, 0)
   payment_method     String?
   payment_gate_id    String?
-  payment_card_number String?
   customer_note      String?
-  discount_type      String   @default("none")
+  discount_type      String         @default("none")
   affiliate_code     String?
-  affiliate_amount   Decimal  @default(0) @db.Decimal(15, 0)
+  affiliate_amount   Decimal        @default(0) @db.Decimal(15, 0)
   coupon_code        String?
-  coupon_amount      Decimal  @default(0) @db.Decimal(15, 0)
-  loyalty_redeemed   Int      @default(0)
-  loyalty_amount     Decimal  @default(0) @db.Decimal(15, 0)
-  loyalty_earned     Int      @default(0)
-  is_pinned          Boolean  @default(false)
-  status             String   @default("pending")
+  coupon_amount      Decimal        @default(0) @db.Decimal(15, 0)
+  loyalty_redeemed   Int            @default(0)
+  loyalty_amount     Decimal        @default(0) @db.Decimal(15, 0)
+  loyalty_earned     Int            @default(0)
+  status             String         @default("pending")
   wp_status          String?
   operator_name      String?
   assigned_at        DateTime?
   completed_at       DateTime?
   snapshot_data      Json?
-  metadata           Json?    @default("{}")
-  goftino_chat_id    String?
-  telegram_chat_id   String?
-  last_user_online   DateTime?
-  created_at         DateTime @default(now())
+  created_at         DateTime       @default(now())
   order_date         DateTime
-  updated_at         DateTime @updatedAt
-  logs               OrderLog[]
+  updated_at         DateTime       @updatedAt
+  is_pinned          Boolean        @default(false)
+  metadata           Json?          @default("{}")
   conversations      Conversation[]
+  logs               OrderLog[]
+  user               User           @relation(fields: [user_id], references: [id])
+
   @@index([affiliate_code])
   @@index([payment_method])
   @@index([order_date])
   @@index([status])
   @@index([operator_name])
-  @@index([status, order_date]) 
-  @@unique([wp_order_id, source])
   @@map("orders")
 }
 
 model OrderLog {
   id          Int      @id @default(autoincrement())
   order_id    Int
-  order       Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
   admin_name  String?
   action      String
   old_status  String?
   new_status  String?
   description String?
   created_at  DateTime @default(now())
+  order       Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
   @@index([order_id])
   @@map("order_logs")
 }
 
-model ExpenseCategory {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  description String?
-  expenses    Expense[]
-  @@map("expense_categories")
-}
-
 model Expense {
-  id             Int             @id @default(autoincrement())
-  title          String
-  amount         Decimal         @db.Decimal(15, 0)
-  category_id    Int
-  category       ExpenseCategory @relation(fields: [category_id], references: [id])
-  due_date       DateTime
-  payment_date   DateTime?
-  status         String          @default("PENDING")
-  is_recurring   Boolean         @default(false)
-  is_overhead    Boolean         @default(false)
-  description    String?
-  attachment_url String?
-  created_at     DateTime        @default(now())
-  updated_at     DateTime        @updatedAt
-  transactions   Transaction[]
-  @@index([due_date])
-  @@index([status])
+  id          Int       @id @default(autoincrement())
+  title       String
+  amount      Decimal   @db.Decimal(15, 0)
+  category    String    @default("other")
+  type        String    @default("one_time")
+  date        DateTime
+  due_date    DateTime?
+  is_paid     Boolean   @default(true)
+  description String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  @@index([category])
+  @@index([date])
   @@map("expenses")
 }
 
-model Transaction {
-  id             Int      @id @default(autoincrement())
-  amount         Decimal  @db.Decimal(15, 0)
-  type           String
-  reference_id   Int?
-  reference_type String?
-  expense_id     Int?
-  expense        Expense? @relation(fields: [expense_id], references: [id])
-  date           DateTime @default(now())
-  description    String?
-  created_at     DateTime @default(now())
-  @@index([date])
-  @@map("transactions")
-}
-
 model CategoryMargin {
-  id          Int      @id @default(autoincrement())
-  wc_id       BigInt   @unique
-  name        String
-  margin_percent Float @default(0)
-  updated_at  DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  wc_id          BigInt   @unique
+  name           String
+  margin_percent Float    @default(0)
+  updated_at     DateTime @updatedAt
+
   @@map("category_margins")
 }
 
-model Affiliate {
-  id                Int      @id @default(autoincrement())
-  code              String   @unique
-  owner_name        String?
-  commission_percent Float   @default(0)
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
-  @@map("affiliates")
-}
-
-model CategoryRule {
-  id          Int      @id @default(autoincrement())
-  name        String
-  keywords    String
-  est_time    Int      @default(15)
-  difficulty  Int      @default(1)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  @@map("category_rules")
-}
-
-model ChatSession {
-  id             Int           @id @default(autoincrement())
-  platform       String        // "telegram", "goftino"
-  external_id    String        // chat_id or goftino_session_id
-  user_id        Int?
-  user           User?         @relation(fields: [user_id], references: [id])
-  status         String        @default("active") // "active", "closed"
-  last_message_at DateTime     @default(now())
-  created_at     DateTime      @default(now())
-  updated_at     DateTime      @updatedAt
-  messages       ChatMessage[]
-  context_data   Json?          @default("{}")
-  @@unique([platform, external_id])
-  @@index([user_id])
-  @@map("chat_sessions")
-}
-
-model ChatMessage {
-  id              Int         @id @default(autoincrement())
-  session_id      Int
-  session         ChatSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
-  sender          String      // "user", "admin", "system"
-  content         String      @db.Text
-  is_read         Boolean     @default(false)
-  created_at      DateTime    @default(now())
-  
-  @@index([session_id])
-  @@map("chat_messages")
-}
-
-model ActionLog {
-  id          BigInt   @id @default(autoincrement())
-  order_id    String?
-  actor       String
-  action      String
-  details     String
-  ip_address  String?
-  created_at  DateTime @default(now())
-  @@map("action_logs")
-}
-
-model OtpCode {
-  id          Int      @id @default(autoincrement())
-  phone       String
-  code        String
-  expires_at  DateTime
-  is_used     Boolean  @default(false)
-  @@map("otp_codes")
-}
-
-model KnowledgeBase {
-  id          Int      @id @default(autoincrement())
-  question    String
-  answer      String
-  topic       String
-  trust_score Int      @default(1)
-  created_at  DateTime @default(now())
-  @@map("knowledge_base")
-}
 model Conversation {
-  id           Int       @id @default(autoincrement())
-  user_id      Int?
-  guest_token  String?
-  order_id     Int?
-  order        Order?    @relation(fields: [order_id], references: [id])
-  status       String    @default("OPEN")
-  messages     Message[]
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-  
+  id          Int       @id @default(autoincrement())
+  user_id     Int?
+  guest_token String?
+  order_id    Int?
+  status      String    @default("OPEN")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  assignee_id Int?
+  assignee    User?     @relation("ConversationAssignee", fields: [assignee_id], references: [id])
+  order       Order?    @relation(fields: [order_id], references: [id])
+  user        User?     @relation(fields: [user_id], references: [id])
+  messages    Message[]
+
   @@index([user_id])
   @@index([guest_token])
   @@index([order_id])
@@ -262,13 +148,12 @@ model Conversation {
 model Message {
   id              Int          @id @default(autoincrement())
   conversation_id Int
-  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
   sender          String
-  content         String       @db.Text
+  content         String
   is_read         Boolean      @default(false)
   created_at      DateTime     @default(now())
-  
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
   @@index([conversation_id])
   @@map("messages")
 }
-

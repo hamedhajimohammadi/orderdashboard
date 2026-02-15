@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import '@/lib/utils'; // Patch BigInt JSON serialization
 
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +9,31 @@ export async function GET() {
     const conversations = await prisma.conversation.findMany({
         orderBy: { updated_at: 'desc' },
         include: {
+            user: {
+                select: {
+                    id: true,
+                    first_name: true, 
+                    last_name: true,
+                    last_seen: true
+                }
+            },
+            assignee: {
+                select: {
+                    id: true,
+                    display_name: true,
+                    first_name: true,
+                    last_name: true
+                }
+            },
             messages: {
                 take: 1,
-                orderBy: { created_at: 'desc' }
+                orderBy: { created_at: 'desc' },
+                select: {
+                    content: true,
+                    created_at: true,
+                    sender: true,
+                    is_read: true 
+                }
             },
             order: {
                 select: {
@@ -22,10 +45,7 @@ export async function GET() {
             }
         }
     });
-    
-    // Add logic to determine "unread" status if needed
-    // The prompt says "List of active chats (those with new messages or WAITING_FOR_ADMIN be bold)".
-    
+
     return NextResponse.json({ conversations });
   } catch (error) {
     console.error('Fetch Conversations Error:', error);

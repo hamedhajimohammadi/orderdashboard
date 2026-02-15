@@ -118,6 +118,13 @@ export default function OrdersTable() {
                                                         ✈️
                                                     </span>
                                                 )}
+                                                {/* Online Status Badge */}
+                                                {order.user?.last_seen && (Date.now() - new Date(order.user.last_seen).getTime() < 5 * 60 * 1000) && (
+                                                     <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200 animate-pulse font-bold flex items-center gap-1 shadow-sm">
+                                                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                                          آنلاین
+                                                     </span>
+                                                )}
                                             </div>
                                             
                                             {/* Badges Row */}
@@ -171,7 +178,23 @@ export default function OrdersTable() {
                                     </td>
                                     
                                     <td className="p-4 text-center font-bold text-gray-700">
-                                        {order.operator_name || <span className="text-gray-400 text-xs">نامشخص</span>}
+                                        <div className="flex flex-col items-center gap-1">
+                                            {order.operator_name || <span className="text-gray-400 text-xs">نامشخص</span>}
+                                            {/* Chat Status Indicator */}
+                                            {order.conversations?.[0] && (
+                                                <div className="flex flex-col gap-0.5">
+                                                    {order.conversations[0].assignee_id ? (
+                                                        <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded border">
+                                                            چت: در دست کارشناس
+                                                        </span>
+                                                    ) : (
+                                                       <span className="text-[9px] px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded border border-orange-100">
+                                                           چت: آزاد
+                                                       </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
 
                                     <td className="p-4 text-gray-500 text-xs font-mono text-center">
